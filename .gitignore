@@ -25,4 +25,7 @@ Thumbs.db
 *.dylib
 
 # My config file
-secrets.py
+variables.py
+
+# DB Process file
+metar_db.py
