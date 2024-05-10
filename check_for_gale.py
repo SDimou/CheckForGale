@@ -37,7 +37,7 @@ create_sat_script = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "create_satellite_file.py"
 )
 create_zzd5_script = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "d5_process.py"
+    os.path.dirname(os.path.abspath(__file__)), "db_process.py"
 )
 greek_mp3 = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "Sounds", "greek_gale.mp3"
