@@ -18,6 +18,7 @@ import tkinter as tk
 from tkinter import messagebox
 import logging
 import variables
+from apscheduler.schedulers.background import BackgroundScheduler
 
 print("ΠΑΡΑΚΑΛΩ ΠΕΡΙΜΕΝΕΤΕ ΝΑ ΕΜΦΑΝΙΣΤΟΥΝ ΤΑ EMAILS ΚΑΙ ΜΗΝ ΚΛΕΙΣΕΤΕ ΑΥΤΟ ΤΟ ΠΑΡΑΘΥΡΟ!")
 print(
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 pop3_server = variables.pop3_server
 username = variables.username
 password = variables.password
+python_env_path = variables.python_env_path
 python_path = variables.python_path
 create_sat_script = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "create_satellite_file.py"
@@ -106,7 +108,7 @@ def handle_new_emails():
                 time_difference = current_time - email_timestamp
                 if time_difference < timedelta(minutes=30):
                     print("Εντοπίστηκε email Γαλλικού Gale!")
-                    subprocess.run([python_path, create_sat_script, "3"])
+                    subprocess.run([python_env_path, create_sat_script, "3"])
                     play_mp3_thread = threading.Thread(
                         target=play_mp3_file, args=(french_mp3,)
                     )
@@ -124,13 +126,17 @@ def handle_new_emails():
                     print("Εντοπίστηκε monitoring email ZZD5!")
                     message = (
                         "Μόλις έγινε λήψη του ZZD5 Monitoring email. Θέλετε να παραχθεί το αρχείο Excel αυτόματα?\n\n"
-                        "Yes = Ναι, να παραχθεί αυτόματα. Δεν θα εμφανιστεί παράθυρο!\n"
-                        "Νο = Όχι, θα το δημιουργήσω μόνος/η μου χειροκίνητα!\n"
+                        "Yes = Ναι, να παραχθεί αυτόματα. Προσοχή, δεν θα εμφανιστεί μαύρο παράθυρο!\n"
+                        "Νο = Όχι, το δημιούργησα ήδη ή θα το δημιουργήσω μόνος/η μου χειροκίνητα!\n"
                     )
+                    root = tk.Tk()
+                    root.withdraw()
+                    root.attributes("-topmost", True)  # Ensure the messagebox is on top
                     answer = messagebox.askyesno(
-                        "ZZD5 Monitoring Email", message, icon="question"
+                        "ZZD5 Monitoring Email", message, icon="question", parent=root
                     )
-                    if answer == "yes":
+                    root.destroy()
+                    if answer:
                         subprocess.run([python_path, create_zzd5_script])
 
         time.sleep(60)
@@ -166,11 +172,12 @@ def show_success_message(country):
     try:
         root = tk.Tk()
         root.withdraw()
+        root.attributes("-topmost", True)  # Ensure the messagebox is on top
         if country == "French":
             msg_text = "Έγινε λήψη και μετατροπή του Γαλλικού Gale!"
         elif country == "Greek":
             msg_text = "Έγινε λήψη και μετατροπή του Ελληνικού Gale!"
-        messagebox.showinfo("Προσοχή!", msg_text)
+        messagebox.showinfo("Προσοχή!", msg_text, parent=root)
         root.destroy()
     except Exception as e:
         logger.error("Error showing success message: %s", e)
@@ -189,7 +196,7 @@ class FileCreatedHandler(FileSystemEventHandler):
         ).startswith(file_prefix):
             logger.info("Ανιχνεύτηκε νέο αρχείο Ελληνικού Gale: %s", event.src_path)
             try:
-                subprocess.run([python_path, create_sat_script, "2"])
+                subprocess.run([python_env_path, create_sat_script, "2"])
                 play_mp3_thread = threading.Thread(
                     target=play_mp3_file, args=(greek_mp3,)
                 )
@@ -246,16 +253,32 @@ def exit_program(icon, item):
     os._exit(0)
 
 
+def clear_and_repopulate_emails():
+    """Clear the processed_emails set and repopulate with current emails."""
+    global processed_emails
+    processed_emails.clear()
+    get_unread_emails(username, password, pop3_server, processed_emails)
+    logger.info("Cleared and repopulated processed_emails at midnight.")
+
+
 if __name__ == "__main__":
     ctypes.windll.kernel32.SetConsoleTitleW("Έλεγχος για Gale")
 
+    # Start email handling thread
     email_thread = threading.Thread(target=handle_new_emails)
     email_thread.daemon = True
     email_thread.start()
 
+    # Set up file system observer
     event_handler = FileCreatedHandler()
     observer = Observer()
     observer.schedule(event_handler, folder_to_watch, recursive=False)
     observer.start()
 
+    # Set up the system tray icon
     create_system_tray_icon()
+
+    # Set up the scheduler to clear and repopulate emails at midnight
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(clear_and_repopulate_emails, "cron", hour=0, minute=0)
+    scheduler.start()
