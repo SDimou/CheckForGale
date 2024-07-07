@@ -35,19 +35,11 @@ username = variables.username
 password = variables.password
 python_env_path = variables.python_env_path
 python_path = variables.python_path
-create_sat_script = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "create_satellite_file.py"
-)
-create_zzd5_script = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "db_process.py"
-)
-greek_mp3 = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "Sounds", "greek_gale.mp3"
-)
-french_mp3 = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "Sounds", "french_gale.mp3"
-)
-icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wind_icon.png")
+create_sat_script = os.path.join(variables.script_path, "create_satellite_file.py")
+create_zzd5_script = os.path.join(variables.script_path, "db_process.py")
+greek_mp3 = os.path.join(variables.script_path, "Sounds", "greek_gale.mp3")
+french_mp3 = os.path.join(variables.script_path, "Sounds", "french_gale.mp3")
+icon_path = os.path.join(variables.script_path, "wind_icon.png")
 folder_to_watch = variables.emk_folder
 file_prefix = "G_WWME22LGAT"
 specific_text = f'WOMQ50 LFPW {date.today().strftime("%d")}'
@@ -118,7 +110,7 @@ def handle_new_emails():
                     play_mp3_thread.start()
                     show_success_thread.start()
 
-            if re.match(zzd5_subject, email["Subject"]):
+            if email["Subject"] and re.match(zzd5_subject, email["Subject"]):
                 email_timestamp = get_email_timestamp(email)
                 current_time = datetime.now(timezone.utc)
                 time_difference = current_time - email_timestamp
@@ -126,8 +118,8 @@ def handle_new_emails():
                     print("Εντοπίστηκε monitoring email ZZD5!")
                     message = (
                         "Μόλις έγινε λήψη του ZZD5 Monitoring email. Θέλετε να παραχθεί το αρχείο Excel αυτόματα?\n\n"
-                        "Yes = Ναι, να παραχθεί αυτόματα. Προσοχή, δεν θα εμφανιστεί μαύρο παράθυρο!\n"
-                        "Νο = Όχι, το δημιούργησα ήδη ή θα το δημιουργήσω μόνος/η μου χειροκίνητα!\n"
+                        "Ναι = Να παραχθεί αυτόματα. Προσοχή, δεν θα εμφανιστεί μαύρο παράθυρο!\n"
+                        "Όχι = Το δημιούργησα ήδη ή θα το δημιουργήσω μόνος/η μου χειροκίνητα!\n"
                     )
                     root = tk.Tk()
                     root.withdraw()
@@ -137,6 +129,7 @@ def handle_new_emails():
                     )
                     root.destroy()
                     if answer:
+                        show_start_message()  # Call the function to show start message
                         subprocess.run([python_path, create_zzd5_script])
 
         time.sleep(60)
@@ -183,8 +176,21 @@ def show_success_message(country):
         logger.error("Error showing success message: %s", e)
 
 
+def show_start_message():
+    """Show start message."""
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)  # Ensure the messagebox is on top
+        msg_text = "Η διαδικασία δημιουργίας του αρχείου Excel monitoring ZZD5 έχει ξεκινήσει!\nΠατήστε ΟΚ και περιμένετε το επόμενο μήνυμα για την ολοκλήρωσή του!"
+        messagebox.showinfo("Monitoring ZZD5", msg_text, parent=root)
+        root.destroy()
+    except Exception as e:
+        logger.error("Error showing start message: %s", e)
+
+
 class FileCreatedHandler(FileSystemEventHandler):
-    """Handler for created files."""
+    """Handler for created and modified files."""
 
     def on_created(self, event):
         """Handle file creation."""
@@ -196,17 +202,18 @@ class FileCreatedHandler(FileSystemEventHandler):
         ).startswith(file_prefix):
             logger.info("Ανιχνεύτηκε νέο αρχείο Ελληνικού Gale: %s", event.src_path)
             try:
-                subprocess.run([python_env_path, create_sat_script, "2"])
-                play_mp3_thread = threading.Thread(
-                    target=play_mp3_file, args=(greek_mp3,)
-                )
-                show_success_thread = threading.Thread(
-                    target=show_success_message, args=("Greek",)
-                )
-                play_mp3_thread.start()
-                show_success_thread.start()
+                process_file(event.src_path)
             except Exception as e:
                 logger.error("Error processing file: %s", e)
+
+
+def process_file(file_path):
+    """Process the created or modified file."""
+    subprocess.run([python_env_path, create_sat_script, "2"])
+    play_mp3_thread = threading.Thread(target=play_mp3_file, args=(greek_mp3,))
+    show_success_thread = threading.Thread(target=show_success_message, args=("Greek",))
+    play_mp3_thread.start()
+    show_success_thread.start()
 
 
 def create_system_tray_icon():
@@ -272,8 +279,9 @@ if __name__ == "__main__":
     # Set up file system observer
     event_handler = FileCreatedHandler()
     observer = Observer()
-    observer.schedule(event_handler, folder_to_watch, recursive=False)
+    observer.schedule(event_handler, path=folder_to_watch, recursive=False)
     observer.start()
+    logger.info("Started file system observer on folder: %s", folder_to_watch)
 
     # Set up the system tray icon
     create_system_tray_icon()

@@ -29,3 +29,6 @@ variables.py
 
 # DB Process file
 metar_db.py
+
+# ZZD5 file
+check_zzd5.py

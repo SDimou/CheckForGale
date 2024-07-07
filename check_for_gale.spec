@@ -5,7 +5,7 @@ a = Analysis(
     ['check_for_gale.py'],
     pathex=[],
     binaries=[],
-    datas=[('create_satellite_file.py', '.'), ('Sounds\\french_gale.mp3', 'Sounds'), ('Sounds\\greek_gale.mp3', 'Sounds'), ('wind_icon.png', '.')],
+    datas=[('create_satellite_file.py', '.'), ('db_process.py', '.'), ('metar_db.py', '.'), ('variables.py', '.'), ('sounds\\french_gale.mp3', 'sounds'), ('sounds\\greek_gale.mp3', 'sounds'), ('wind_icon.png', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
